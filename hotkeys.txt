@@ -1,0 +1,6 @@
+C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\csgosongs
+1:O;
+2:NULL;
+3:NULL;
+4:NULL;
+5:NULL;
