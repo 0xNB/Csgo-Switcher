@@ -43,6 +43,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.SwingConstants;
+import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
@@ -52,6 +53,7 @@ import static java.nio.file.StandardWatchEventKinds.*;
 
 public class CsgoSounds {
 
+	private static Path convertpath = null;
 	protected static boolean closewanted = false;
 	protected static List<String> hotkeybuttonstrings = new ArrayList<>();
 	private static boolean fileexisted = false;
@@ -72,8 +74,8 @@ public class CsgoSounds {
 	private static Font heading = new Font("Comic Sans MS", Font.BOLD, 14);
 	private static int returnval = 0;
 	private static File selectedfile = new File("");
-//	protected static List<String> wavfilenames = new ArrayList<>();
-//	protected static List<String> wavfilenamesfull = new ArrayList<>();
+	// protected static List<String> wavfilenames = new ArrayList<>();
+	// protected static List<String> wavfilenamesfull = new ArrayList<>();
 	private static JCheckBox box;
 	private static boolean disabletrue = false;
 	protected static JLabel statusanzeige = new JLabel("");
@@ -116,15 +118,18 @@ public class CsgoSounds {
 		} catch (IOException e2) {
 			JOptionPane.showMessageDialog(null, "Could not create Watch Service", "Error", JOptionPane.ERROR_MESSAGE);
 		}
-			try {
-				watcher2 = FileSystems.getDefault().newWatchService();
-			} catch (IOException e2) {
-				// TODO Auto-generated catch block
-				e2.printStackTrace();
-			}
+		try {
+			watcher2 = FileSystems.getDefault().newWatchService();
+		} catch (IOException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
 
 		JFrame frame = new JFrame("CSGO Sound Changer");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		DragAndDropFactory dnd = new DragAndDropFactory();
+		TransferHandler tf = dnd.getTransferHandler();
+		frame.setTransferHandler(tf);
 
 		frame.addWindowListener(new WindowAdapter() {
 			@Override
@@ -193,7 +198,6 @@ public class CsgoSounds {
 				}
 			}
 
-
 			if (!selectedfile.toString().trim().equals("")) {
 				createSubFolders();
 				createSoundWatcher();
@@ -208,7 +212,6 @@ public class CsgoSounds {
 			while (matcher.find()) {
 				hotkeybuttonstrings.add(matcher.group(1));
 			}
-
 
 		}
 
@@ -270,21 +273,19 @@ public class CsgoSounds {
 					statusanzeige.setText("RANDOM ACTIVE");
 				} else {
 					randomizedmode = false;
-					if(!randomwavfilenames.isEmpty()){
-					statusanzeige.setText(randomwavfilenames.get(currentsong));
-					}
-					else{
+					if (!randomwavfilenames.isEmpty()) {
+						statusanzeige.setText(randomwavfilenames.get(currentsong));
+					} else {
 						statusanzeige.setText("Pick Random first!");
 					}
 				}
 			}
 		});
-		
-		if(!randomwavfilenames.isEmpty()){
+
+		if (!randomwavfilenames.isEmpty()) {
 			statusanzeige.setText(randomwavfilenames.get(currentsong));
-			}
-			else{
-				statusanzeige.setText("Pick Random first!");
+		} else {
+			statusanzeige.setText("Pick Random first!");
 		}
 
 		final JFileChooser fc = new JFileChooser();
@@ -393,7 +394,7 @@ public class CsgoSounds {
 				if (returnval == JFileChooser.APPROVE_OPTION) {
 					randomsong = Paths.get(fc.getSelectedFile().toString());
 					createRandomSubfolders();
-					if(windowlistenerthread != null){
+					if (windowlistenerthread != null) {
 						windowlistenerthread.interrupt();
 					}
 					createRandomWatcher();
@@ -424,7 +425,7 @@ public class CsgoSounds {
 					selectedfile = fc.getSelectedFile();
 					createSubFolders();
 					updateLabels();
-					if(soundlistenerthread != null){
+					if (soundlistenerthread != null) {
 						soundlistenerthread.interrupt();
 					}
 					createSoundWatcher();
@@ -722,25 +723,25 @@ public class CsgoSounds {
 	// }
 
 	protected static void createSubFolders() {
-//		String[] directories = selectedfile.list(new FilenameFilter() {
-//			@Override
-//			public boolean accept(File current, String name) {
-//				return new File(current, name).isDirectory();
-//			}
-//		});
-//
-//		wavfilenames.clear();
-//		wavfilenamesfull.clear();
-//		wavfilenames.addAll(Arrays.asList(directories));
-//		System.out.println(wavfilenames);
-//
-//		// List<String> foldernames = new ArrayList<>();
-//
-//		wavfilenames.forEach(s -> {
-//			wavfilenamesfull.add(selectedfile.toString() + "\\" + s);
-//		});
-//		
-		String[] wavfiles = selectedfile.list(new FilenameFilter(){
+		// String[] directories = selectedfile.list(new FilenameFilter() {
+		// @Override
+		// public boolean accept(File current, String name) {
+		// return new File(current, name).isDirectory();
+		// }
+		// });
+		//
+		// wavfilenames.clear();
+		// wavfilenamesfull.clear();
+		// wavfilenames.addAll(Arrays.asList(directories));
+		// System.out.println(wavfilenames);
+		//
+		// // List<String> foldernames = new ArrayList<>();
+		//
+		// wavfilenames.forEach(s -> {
+		// wavfilenamesfull.add(selectedfile.toString() + "\\" + s);
+		// });
+		//
+		String[] wavfiles = selectedfile.list(new FilenameFilter() {
 			@Override
 			public boolean accept(File dir, String name) {
 				return name.toLowerCase().endsWith(".wav");
@@ -749,7 +750,7 @@ public class CsgoSounds {
 		wavfilenames.clear();
 		wavfilenamesfull.clear();
 		List<String> longnames = new ArrayList<>(Arrays.asList(wavfiles));
-		for(int i = 0; i < longnames.size(); i++){
+		for (int i = 0; i < longnames.size(); i++) {
 			String temp = longnames.get(i);
 			longnames.set(i, temp.substring(0, temp.lastIndexOf('.')));
 		}
@@ -757,7 +758,7 @@ public class CsgoSounds {
 		wavfilenames.forEach(s -> {
 			wavfilenamesfull.add(selectedfile.toString() + "\\" + s);
 		});
-		
+
 	}
 
 	protected static void createRandomSubfolders() {
@@ -771,11 +772,11 @@ public class CsgoSounds {
 		randomwavfilenames.clear();
 		randomwavfilenamesfull.clear();
 		List<String> longnames = new ArrayList<>(Arrays.asList(directories));
-		for(int i = 0; i < longnames.size(); i++){
+		for (int i = 0; i < longnames.size(); i++) {
 			String temp = longnames.get(i);
 			longnames.set(i, temp.substring(0, temp.lastIndexOf('.')));
 		}
-		
+
 		randomwavfilenames.addAll(longnames);
 
 		randomwavfilenames.forEach(s -> {
@@ -784,7 +785,7 @@ public class CsgoSounds {
 
 		hasrandom = true;
 		statusanzeige.setText(randomwavfilenames.get(currentsong));
-		
+
 	}
 
 	// Method to unregister everything, make sure that there are no background
@@ -879,20 +880,20 @@ public class CsgoSounds {
 		}
 	}
 
-	private static void createRandomWatcher(){
-		if(watcher != null){
+	private static void createRandomWatcher() {
+		if (watcher != null) {
 			try {
 				randomsong.register(watcher, ENTRY_CREATE, ENTRY_DELETE);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			windowlistenerthread = new WindowListenerThread(watcher,1);
+			windowlistenerthread = new WindowListenerThread(watcher, 1);
 			windowlistenerthread.start();
 		}
 	}
-	
-	private static void createSoundWatcher(){
+
+	private static void createSoundWatcher() {
 		Path p = Paths.get(selectedfile.toURI());
 		try {
 			p.register(watcher2, ENTRY_CREATE, ENTRY_DELETE);
@@ -900,10 +901,44 @@ public class CsgoSounds {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		soundlistenerthread = new WindowListenerThread(watcher2,2);
+		soundlistenerthread = new WindowListenerThread(watcher2, 2);
 		soundlistenerthread.start();
 	}
-	
+
+	protected static void processFiles(List<File> l) {
+		ArrayList<File> tempFiles = new ArrayList<>();
+		for (File f : l) {
+			if (f.getName().toLowerCase().endsWith("mp3")) {
+				tempFiles.add(f);
+			}
+		}
+		;
+		if (tempFiles.isEmpty())
+			return;
+
+		if (convertpath == null) {
+			JLabel msgLabel = new JLabel(
+					"<html>MP3 File Detected! Ready for Conversion.<br>  But first you have to choose a folder to place the converted File! Do you want to choose one now?</html>",
+					SwingConstants.CENTER);
+			int result = JOptionPane.showConfirmDialog(null, msgLabel, "Chose Folder now?", JOptionPane.YES_NO_OPTION);
+			if(!(result == JOptionPane.YES_OPTION)){
+				return;
+			}
+			JFileChooser chooser = new JFileChooser();
+			chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+			int returnval = chooser.showOpenDialog(null);
+			if(returnval == JFileChooser.APPROVE_OPTION){
+				convertpath = chooser.getSelectedFile().toPath();
+			}
+			else{
+				return;
+			}
+		}
+
+		
+		
+	}
+
 	public static File getSelectedfile() {
 		return selectedfile;
 	}
