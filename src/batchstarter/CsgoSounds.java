@@ -1,7 +1,9 @@
 package batchstarter;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -14,11 +16,14 @@ import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -31,6 +36,7 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,6 +44,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
@@ -47,6 +54,8 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JProgressBar;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -54,6 +63,8 @@ import javax.swing.UnsupportedLookAndFeelException;
 import org.apache.commons.io.FilenameUtils;
 import org.jnativehook.GlobalScreen;
 import org.jnativehook.NativeHookException;
+import org.jnativehook.SwingDispatchService;
+
 import static java.nio.file.StandardWatchEventKinds.*;
 
 public class CsgoSounds {
@@ -68,7 +79,7 @@ public class CsgoSounds {
 	protected static Path batchfile = Paths.get(System.getProperty("user.dir") + "/changefiles.bat");
 	public static String newline = System.getProperty("line.separator");
 	private static String defaultText = "5" + newline + "" + newline + "" + newline + "" + newline + "" + newline
-			+ "1:NULL;" + newline + "2:NULL;" + newline + "3:NULL;" + newline + "4:NULL;" + newline + "5:NULL;";
+			+ ""+newline + "1:NULL;" + newline + "2:NULL;" + newline + "3:NULL;" + newline + "4:NULL;" + newline + "5:NULL;";
 	protected static boolean waitforinput = false;
 	protected static String lastpressed = "";
 	protected static JLabel pressedbutton = new JLabel("Waiting for Input!", SwingConstants.CENTER);
@@ -104,11 +115,16 @@ public class CsgoSounds {
 	private static Thread soundlistenerthread = null;
 	private static WatchService watcher = null;
 	private static WatchService watcher2 = null;
+	private static ArrayList<File> tempFiles = null;
+	private static JProgressBar progressBar = null;
+	 private static JFrame convf = null;
+	 private static MyConverter conv;
+	 private static JLabel statuscounter;
+
 
 	public static void main(String[] args) {
 
 		// Sets System Default Look & Feel
-
 		try {
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException
@@ -123,480 +139,529 @@ public class CsgoSounds {
 		} catch (IOException e2) {
 			JOptionPane.showMessageDialog(null, "Could not create Watch Service", "Error", JOptionPane.ERROR_MESSAGE);
 		}
-		try {
-			watcher2 = FileSystems.getDefault().newWatchService();
-		} catch (IOException e2) {
-			// TODO Auto-generated catch block
-			e2.printStackTrace();
-		}
 
-		JFrame frame = new JFrame("CSGO Sound Changer");
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		DragAndDropFactory dnd = new DragAndDropFactory();
-		TransferHandler tf = dnd.getTransferHandler();
-		frame.setTransferHandler(tf);
 
-		frame.addWindowListener(new WindowAdapter() {
-			@Override
-			public void windowClosing(WindowEvent e) {
-
-				shutDown();
-			}
-		});
-
-		// Try to create hotkeys.txt if it already exists then give exception
-
-		try {
-			Files.createDirectories(savefile.getParent());
-			Files.createFile(savefile);
-		}
-
-		catch (FileAlreadyExistsException e) {
-
-			// set flag that the file could be loaded so no more info is written
-			// in it.
-
-			fileexisted = true;
-
-		}
-
-		catch (IOException e1) {
-			JOptionPane.showMessageDialog(null, "IO Exception bei Directory", "Error", JOptionPane.ERROR_MESSAGE);
-			e1.printStackTrace();
-		}
-
-		// After here there has to be a file, with content or without
-		// Check if the file was created or if it was there.
-
-		if (!fileexisted) {
-			writeToHotkey(defaultText);
-		}
-
-		// Reads the whole hotkeys.txt file and saves chars after ':' to the
-		// hotkey list
-
-		try (BufferedReader r = Files.newBufferedReader(savefile)) {
-
-			String wholedoc = "";
-
-			hotkeysize = Integer.parseInt(r.readLine());
-
-			selectedfile = new File(r.readLine());
-			csgomainfolder = Paths.get(r.readLine());
-			randomsong = Paths.get(r.readLine());
-
-			if (!randomsong.toString().equals("")) {
-				createRandomSubfolders();
-				hasrandom = true;
-				createRandomWatcher();
-			}
-
-			String readhotkeyorder = r.readLine();
-			if (!readhotkeyorder.equals("")) {
-				String[] result = readhotkeyorder.split(",");
-				Arrays.asList(result).forEach(s -> hotkeyorder.add(Integer.parseInt(s)));
-			}
-
-			else {
-				for (int i = 0; i < hotkeysize; i++) {
-					hotkeyorder.add(i + 1);
-				}
-			}
-
-			if (!selectedfile.toString().trim().equals("")) {
-				createSubFolders();
-				createSoundWatcher();
-			}
-
-			while (r.ready()) {
-				wholedoc += r.readLine() + "\n";
-			}
-
-			Pattern pattern = Pattern.compile(":(.*?);");
-			Matcher matcher = pattern.matcher(wholedoc);
-			while (matcher.find()) {
-				hotkeybuttonstrings.add(matcher.group(1));
-			}
-
-		}
-
-		catch (IOException e1) {
-			JOptionPane.showMessageDialog(null, "IOException beim File lesen", "Error", JOptionPane.ERROR_MESSAGE);
-			e1.printStackTrace();
-		}
-
-		// Creates the Main JFrame and fills it with information from
-		// hotkeys.txt
-
-		JButton exitknopf = new JButton("EXIT");
-		frame.setSize(350, 300 + hotkeysize * 45);
-		frame.setFont(font);
-		frame.setLayout(new GridLayout(0, 2, 5, 5));
-		JLabel curhotkey = new JLabel("Current Song : ", SwingConstants.CENTER);
-		curhotkey.setFont(heading);
-		frame.add(curhotkey);
-		frame.add(statusanzeige);
-		statusanzeige.setFont(font);
-		for (int i = 0; i < hotkeysize; i++) {
-			hotkeylist.add(new JButton());
-		}
-
-		JLabel l;
-
-		for (int i = 0; i < hotkeylist.size(); i++) {
-			l = new JLabel();
-			l.setFont(font);
-			l.setText("Undefined");
-			hotkeylist.get(i).setFont(font);
-			hotkeylist.get(i).setText(hotkeybuttonstrings.get(i));
-			namelabels.add(l);
-		}
-
-		updateLabels();
-
-		for (int i = 0; i < hotkeylist.size(); i++) {
-			frame.add(hotkeylist.get(i));
-			if (i < hotkeylist.size() - 1) {
-				frame.add(namelabels.get(i));
-			}
-			System.out.println(namelabels.get(i).getText());
-		}
-
-		JLabel random = new JLabel("(Random)");
-		random.setFont(font);
-
-		frame.add(random);
-		Font instructfont = new Font("Comic Sans MS", Font.PLAIN, 13);
-		JCheckBox enablerandom = new JCheckBox("Randomized Mode");
-		enablerandom.setFont(instructfont);
-		enablerandom.addItemListener(new ItemListener() {
-
-			@Override
-			public void itemStateChanged(ItemEvent arg0) {
-				if (randomizedmode == false) {
-					randomizedmode = true;
-					statusanzeige.setText("RANDOM ACTIVE");
-				} else {
-					randomizedmode = false;
-					if (!randomwavfilenames.isEmpty()) {
-						statusanzeige.setText(randomwavfilenames.get(currentsong));
-					} else {
-						statusanzeige.setText("Pick Random first!");
-					}
-				}
-			}
-		});
-
-		if (!randomwavfilenames.isEmpty()) {
-			statusanzeige.setText(randomwavfilenames.get(currentsong));
-		} else {
-			statusanzeige.setText("Pick Random first!");
-		}
-
-		final JFileChooser fc = new JFileChooser();
-		fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-		final JButton b = new JButton("Open File");
-		b.setFont(font);
-
-		box = new JCheckBox("Disable");
-		box.addItemListener(new ItemListener() {
-
-			@Override
-			public void itemStateChanged(ItemEvent arg0) {
-
-				Object source = arg0.getItemSelectable();
-
-				if (source == box) {
-
-					if (disabletrue == false)
-						disabletrue = true;
-					else {
-						disabletrue = false;
-					}
-
-				}
-
-			}
-
-		});
-		frame.add(enablerandom);
-		frame.add(box);
-
-		for (int i = 0; i < 1; i++) {
-			frame.add(new Label(""));
-		}
-
-		frame.add(new JLabel());
-
-		JButton orderChange = new JButton("Change Order");
-		orderChange.setFont(font);
-		frame.add(orderChange);
-		JButton preferredSize = new JButton("Set Size");
-		preferredSize.setFont(font);
-		frame.add(preferredSize);
-		preferredSize.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-
-				String text = JOptionPane.showInputDialog("Bitte gib deine gew¸nschte Grˆﬂe an!");
 				try {
-					int hotkeysiz = Integer.parseInt(text);
-					hotkeysave = hotkeysiz;
-					haschanged = true;
-				} catch (NumberFormatException e) {
-					hotkeysave = 5;
-					haschanged = true;
+					watcher2 = FileSystems.getDefault().newWatchService();
+				} catch (IOException e2) {
+					// TODO Auto-generated catch block
+					e2.printStackTrace();
 				}
 
-			}
+				JFrame frame = new JFrame("CSGO Sound Changer");
+				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+				DragAndDropFactory dnd = new DragAndDropFactory();
+				TransferHandler tf = dnd.getTransferHandler();
+				frame.setTransferHandler(tf);
 
-		});
+				frame.addWindowListener(new WindowAdapter() {
+					@Override
+					public void windowClosing(WindowEvent e) {
 
-		orderChange.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-
-				createAskWindow();
-				showFiles();
-
-			}
-
-		});
-
-		JLabel instruct = new JLabel("Choose Sound Folder:", SwingConstants.CENTER);
-		instruct.setFont(instructfont);
-		frame.add(instruct);
-
-		frame.add(b);
-		JLabel csgolabel = new JLabel("Choose CSGO Folder", SwingConstants.CENTER);
-		csgolabel.setFont(instructfont);
-		frame.add(csgolabel);
-		JButton csgofolderbutton = new JButton("Open File");
-		csgofolderbutton.setFont(font);
-		csgofolderbutton.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				returnval = fc.showOpenDialog(b);
-				if (returnval == JFileChooser.APPROVE_OPTION) {
-					csgomainfolder = Paths.get(fc.getSelectedFile().getPath());
-				}
-			}
-
-		});
-
-		JLabel chooserandom = new JLabel("Choose Random Folder (Optional)");
-		chooserandom.setFont(new Font("Comic Sans MS", Font.PLAIN, 11));
-
-		JButton chooserandomb = new JButton("Open File");
-		chooserandomb.setFont(font);
-		chooserandomb.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				returnval = fc.showOpenDialog(b);
-				if (returnval == JFileChooser.APPROVE_OPTION) {
-					randomsong = Paths.get(fc.getSelectedFile().toString());
-					createRandomSubfolders();
-					if (windowlistenerthread != null) {
-						windowlistenerthread.interrupt();
+						shutDown();
 					}
-					createRandomWatcher();
+				});
+
+				// Try to create hotkeys.txt if it already exists then give
+				// exception
+
+				try {
+					Files.createDirectories(savefile.getParent());
+					Files.createFile(savefile);
 				}
 
-			}
+				catch (FileAlreadyExistsException e) {
 
-		});
+					// set flag that the file could be loaded so no more info is
+					// written
+					// in it.
 
-		frame.add(csgofolderbutton);
-		frame.add(chooserandom);
-		frame.add(chooserandomb);
-		JButton saveknopf = new JButton("SAVE");
-		saveknopf.setFont(font);
+					fileexisted = true;
 
-		frame.add(saveknopf);
-		exitknopf.setFont(heading);
-		frame.add(exitknopf);
+				}
 
-		// Registers all action listeners
+				catch (IOException e1) {
+					JOptionPane.showMessageDialog(null, "IO Exception bei Directory", "Error",
+							JOptionPane.ERROR_MESSAGE);
+					e1.printStackTrace();
+				}
 
-		b.addActionListener(new ActionListener() {
+				// After here there has to be a file, with content or without
+				// Check if the file was created or if it was there.
 
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				returnval = fc.showOpenDialog(b);
-				if (returnval == JFileChooser.APPROVE_OPTION) {
-					selectedfile = fc.getSelectedFile();
-					createSubFolders();
-					updateLabels();
-					if (soundlistenerthread != null) {
-						soundlistenerthread.interrupt();
+				if (!fileexisted) {
+					writeToHotkey(defaultText);
+				}
+
+				// Reads the whole hotkeys.txt file and saves chars after ':' to
+				// the
+				// hotkey list
+
+				try (BufferedReader r = Files.newBufferedReader(savefile)) {
+
+					String wholedoc = "";
+					System.out.println(Thread.currentThread());
+
+					hotkeysize = Integer.parseInt(r.readLine());
+
+					selectedfile = new File(r.readLine());
+					csgomainfolder = Paths.get(r.readLine());
+					randomsong = Paths.get(r.readLine());
+
+					if (!randomsong.toString().equals("")) {
+						createRandomSubfolders();
+						hasrandom = true;
+						createRandomWatcher();
 					}
-					createSoundWatcher();
-				}
-			}
 
-		});
-
-		addActionListeners();
-
-		saveknopf.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-
-				boolean hotkeyorderempty = false;
-				StringBuilder order = new StringBuilder();
-				StringBuilder temp = new StringBuilder();
-
-				if (!hotkeyorder.isEmpty()) {
-					hotkeyorder.forEach(i -> {
-						order.append(String.valueOf(i)).append(",");
-					});
-					temp.append(order.substring(0, order.length() - 1));
-				}
-
-				else {
-					hotkeyorderempty = true;
-				}
-
-				StringBuilder text = new StringBuilder();
-				if (haschanged) {
-					text.append(hotkeysave + newline);
-					order.setLength(0);
-					hotkeyorderempty = true;
-				} else {
-					text.append(hotkeysize + newline);
-				}
-
-				text.append(selectedfile.toString() + newline);
-				text.append(csgomainfolder.toString() + newline);
-				text.append(randomsong.toString() + newline);
-				System.out.println("Der Ordner heiﬂt: " + csgomainfolder.toString());
-
-				if (hotkeyorderempty) {
-					text.append("" + newline);
-				} else {
-					text.append(temp.toString() + newline);
-				}
-
-				if (!haschanged) {
-					for (int i = 0; i < hotkeylist.size(); i++) {
-						text.append(String.valueOf(i + 1) + ":" + hotkeylist.get(i).getText() + ";" + newline);
+					String readhotkeyorder = r.readLine();
+					if (!readhotkeyorder.equals("")) {
+						String[] result = readhotkeyorder.split(",");
+						Arrays.asList(result).forEach(s -> hotkeyorder.add(Integer.parseInt(s)));
 					}
-				} else {
-					if (hotkeysave > hotkeylist.size()) {
-						for (int i = 0; i < hotkeylist.size(); i++) {
-							text.append(String.valueOf(i + 1) + ":" + hotkeylist.get(i).getText() + ";" + newline);
-						}
-						for (int i = hotkeylist.size(); i <= hotkeysave; i++) {
-							text.append(String.valueOf(i + 1) + ":NULL;" + newline);
-						}
 
-					} else {
-						for (int i = 0; i < hotkeysave; i++) {
-							text.append(String.valueOf(i + 1) + ":" + hotkeylist.get(i).getText() + ";" + newline);
+					else {
+						for (int i = 0; i < hotkeysize; i++) {
+							hotkeyorder.add(i + 1);
 						}
 					}
+
+					if (!selectedfile.toString().trim().equals("")) {
+						createSubFolders();
+						createSoundWatcher();
+					}
+					
+					String readcompresspath = r.readLine();
+					if(!readcompresspath.trim().equals("")){
+						convertpath = Paths.get(readcompresspath);
+					}
+
+					while (r.ready()) {
+						wholedoc += r.readLine() + "\n";
+					}
+
+					Pattern pattern = Pattern.compile(":(.*?);");
+					Matcher matcher = pattern.matcher(wholedoc);
+					while (matcher.find()) {
+						hotkeybuttonstrings.add(matcher.group(1));
+					}
+
 				}
 
-				writeToHotkey(text.toString());
-
-				hotkeybuttonstrings.clear();
-
-				for (JButton j : hotkeylist) {
-					hotkeybuttonstrings.add(j.getText());
+				catch (IOException e1) {
+					JOptionPane.showMessageDialog(null, "IOException beim File lesen", "Error",
+							JOptionPane.ERROR_MESSAGE);
+					e1.printStackTrace();
 				}
 
-				statusanzeige.setText("Erfolgreich!");
+				// Creates the Main JFrame and fills it with information from
+				// hotkeys.txt
 
-				// if (!(selectedfile.toString() == "")) {
-				// StringBuilder firstbunch = new StringBuilder();
-				// for (int i = 0; i < wavfilenames.size(); i++) {
-				// firstbunch.append(
-				// "IF /i \"%wantedkey%\"==\"" + i + "\" GOTO " +
-				// wavfilenames.get(i).trim() + newline);
-				// }
-				//
-				// StringBuilder secondbunch = new StringBuilder();
-				// String maincsgofolder = selectedfile.toString().substring(0,
-				// selectedfile.toString().lastIndexOf('\\'));
-				// for (int i = 0; i < wavfilenames.size(); i++) {
-				// secondbunch.append(":" + wavfilenames.get(i).trim() +
-				// newline + "XCOPY \""
-				// + wavfilenamesfull.get(i) + "\\" + "voice_input.wav\" \"" +
-				// maincsgofolder + "\" /Y"
-				// + newline + "GOTO end" + newline);
-				// }
-				// String batchtext = "@echo off" + newline + "SET wantedkey=%1"
-				// + newline + firstbunch.toString()
-				// + "GOTO end" + newline + secondbunch.toString() + ":end" +
-				// newline + "exit 0";
-				//
-				// writeToBatch(batchtext);
-				// actionsucceful = true;
-				// }
-				//
-				// else {
-				// actionsucceful = false;
-				// }
-				//
-				// if (actionsucceful) {
-				// statusanzeige.setText("Erfolgreich!");
-				// } else {
-				// statusanzeige.setText("Sound Path ausw‰hlen!");
-				// }
-				// try {
-				// Thread.sleep(500);
-				// } catch (InterruptedException e) {
-				// e.printStackTrace();
-				// }
+				JButton exitknopf = new JButton("EXIT");
+				frame.setSize(350, 300 + hotkeysize * 45);
+				frame.setFont(font);
+				frame.setLayout(new GridLayout(0, 2, 5, 5));
+				JLabel curhotkey = new JLabel("Current Song : ", SwingConstants.CENTER);
+				curhotkey.setFont(heading);
+				frame.add(curhotkey);
+				frame.add(statusanzeige);
+				statusanzeige.setFont(font);
+				for (int i = 0; i < hotkeysize; i++) {
+					hotkeylist.add(new JButton());
+				}
 
-			}
+				JLabel l;
+				System.out.println(Thread.currentThread());
 
-		});
+				for (int i = 0; i < hotkeylist.size(); i++) {
+					l = new JLabel();
+					l.setFont(font);
+					l.setText("Undefined");
+					hotkeylist.get(i).setFont(font);
+					hotkeylist.get(i).setText(hotkeybuttonstrings.get(i));
+					namelabels.add(l);
+				}
 
-		exitknopf.addActionListener(new ActionListener() {
+				updateLabels();
 
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				shutDown();
-			}
+				for (int i = 0; i < hotkeylist.size(); i++) {
+					frame.add(hotkeylist.get(i));
+					if (i < hotkeylist.size() - 1) {
+						frame.add(namelabels.get(i));
+					}
+					System.out.println(namelabels.get(i).getText());
+				}
 
-		});
+				JLabel random = new JLabel("(Random)");
+				random.setFont(font);
 
-		frame.setLocationRelativeTo(null);
-		frame.setVisible(true);
+				frame.add(random);
+				Font instructfont = new Font("Comic Sans MS", Font.PLAIN, 13);
+				JCheckBox enablerandom = new JCheckBox("Randomized Mode");
+				enablerandom.setFont(instructfont);
+				enablerandom.addItemListener(new ItemListener() {
 
-		// registering the keylistener hook
+					@Override
+					public void itemStateChanged(ItemEvent arg0) {
+						if (randomizedmode == false) {
+							randomizedmode = true;
+							statusanzeige.setText("RANDOM ACTIVE");
+						} else {
+							randomizedmode = false;
+							if (!randomwavfilenames.isEmpty()) {
+								statusanzeige.setText(randomwavfilenames.get(currentsong));
+							} else {
+								statusanzeige.setText("Pick Random first!");
+							}
+						}
+					}
+				});
 
-		try {
-			GlobalScreen.registerNativeHook();
-		} catch (NativeHookException ex) {
-			System.err.println("There was a problem registering the native hook.");
-			System.err.println(ex.getMessage());
-			JOptionPane.showMessageDialog(null, "Konnte Native Hook nicht laden", "Error", JOptionPane.ERROR_MESSAGE);
-			System.exit(1);
-		}
+				if (!randomwavfilenames.isEmpty()) {
+					statusanzeige.setText(randomwavfilenames.get(currentsong));
+				} else {
+					statusanzeige.setText("Pick Random first!");
+				}
 
-		GlobalScreen.addNativeKeyListener(new GlobalKeyListenerDemo());
+				final JFileChooser fc = new JFileChooser();
+				fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+				final JButton b = new JButton("Open File");
+				b.setFont(font);
 
-		// Get the logger for "org.jnativehook" and set the level to off.
+				box = new JCheckBox("Disable");
+				box.addItemListener(new ItemListener() {
 
-		Logger logger = Logger.getLogger(GlobalScreen.class.getPackage().getName());
-		logger.setLevel(Level.OFF);
+					@Override
+					public void itemStateChanged(ItemEvent arg0) {
 
-		// Change the level for all handlers attached to the default logger.
+						Object source = arg0.getItemSelectable();
 
-		Handler[] handlers = Logger.getLogger("").getHandlers();
-		for (int i = 0; i < handlers.length; i++) {
-			handlers[i].setLevel(Level.OFF);
-		}
+						if (source == box) {
 
-		// "Main Loop" Sleeps 1 s and then repeats. Waits for Shutdown via
-		// System.exit(0)
+							if (disabletrue == false)
+								disabletrue = true;
+							else {
+								disabletrue = false;
+							}
 
+						}
+
+					}
+
+				});
+				frame.add(enablerandom);
+				frame.add(box);
+
+				for (int i = 0; i < 1; i++) {
+					frame.add(new Label(""));
+				}
+
+				JButton chooseConvertFolder = new JButton("Conversion Folder");
+				chooseConvertFolder.setFont(instructfont);
+				chooseConvertFolder.addActionListener(new ActionListener(){
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+						JFileChooser chooser = new JFileChooser();
+						chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+						int returnval = chooser.showOpenDialog(null);
+						if (returnval == JFileChooser.APPROVE_OPTION) {
+							convertpath = chooser.getSelectedFile().toPath();
+						} else {
+							return;
+						}
+					}
+				});
+
+				frame.add(chooseConvertFolder);
+				
+				JButton orderChange = new JButton("Change Order");
+				orderChange.setFont(font);
+				frame.add(orderChange);
+				JButton preferredSize = new JButton("Set Size");
+				preferredSize.setFont(font);
+				frame.add(preferredSize);
+				preferredSize.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+
+						String text = JOptionPane.showInputDialog("Bitte gib deine gew¸nschte Grˆﬂe an!");
+						try {
+							int hotkeysiz = Integer.parseInt(text);
+							hotkeysave = hotkeysiz;
+							haschanged = true;
+						} catch (NumberFormatException e) {
+							hotkeysave = 5;
+							haschanged = true;
+						}
+
+					}
+
+				});
+
+				orderChange.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+
+						createAskWindow();
+						showFiles();
+
+					}
+
+				});
+
+				JLabel instruct = new JLabel("Choose Sound Folder:", SwingConstants.CENTER);
+				instruct.setFont(instructfont);
+				frame.add(instruct);
+
+				frame.add(b);
+				JLabel csgolabel = new JLabel("Choose CSGO Folder", SwingConstants.CENTER);
+				csgolabel.setFont(instructfont);
+				frame.add(csgolabel);
+				JButton csgofolderbutton = new JButton("Open File");
+				csgofolderbutton.setFont(font);
+				csgofolderbutton.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+						returnval = fc.showOpenDialog(b);
+						if (returnval == JFileChooser.APPROVE_OPTION) {
+							csgomainfolder = Paths.get(fc.getSelectedFile().getPath());
+						}
+					}
+
+				});
+
+				JLabel chooserandom = new JLabel("Choose Random Folder (Optional)");
+				chooserandom.setFont(new Font("Comic Sans MS", Font.PLAIN, 11));
+
+				JButton chooserandomb = new JButton("Open File");
+				chooserandomb.setFont(font);
+				chooserandomb.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+						returnval = fc.showOpenDialog(b);
+						if (returnval == JFileChooser.APPROVE_OPTION) {
+							randomsong = Paths.get(fc.getSelectedFile().toString());
+							createRandomSubfolders();
+							if (windowlistenerthread != null) {
+								windowlistenerthread.interrupt();
+							}
+							createRandomWatcher();
+						}
+
+					}
+
+				});
+
+				frame.add(csgofolderbutton);
+				frame.add(chooserandom);
+				frame.add(chooserandomb);
+				JButton saveknopf = new JButton("SAVE");
+				saveknopf.setFont(font);
+
+				frame.add(saveknopf);
+				exitknopf.setFont(heading);
+				frame.add(exitknopf);
+
+				// Registers all action listeners
+
+				b.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+						returnval = fc.showOpenDialog(b);
+						if (returnval == JFileChooser.APPROVE_OPTION) {
+							selectedfile = fc.getSelectedFile();
+							createSubFolders();
+							updateLabels();
+							if (soundlistenerthread != null) {
+								soundlistenerthread.interrupt();
+							}
+							createSoundWatcher();
+						}
+					}
+
+				});
+
+				addActionListeners();
+
+				saveknopf.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+
+						boolean hotkeyorderempty = false;
+						StringBuilder order = new StringBuilder();
+						StringBuilder temp = new StringBuilder();
+
+						if (!hotkeyorder.isEmpty()) {
+							hotkeyorder.forEach(i -> {
+								order.append(String.valueOf(i)).append(",");
+							});
+							temp.append(order.substring(0, order.length() - 1));
+						}
+
+						else {
+							hotkeyorderempty = true;
+						}
+
+						StringBuilder text = new StringBuilder();
+						if (haschanged) {
+							text.append(hotkeysave + newline);
+							order.setLength(0);
+							hotkeyorderempty = true;
+						} else {
+							text.append(hotkeysize + newline);
+						}
+
+						text.append(selectedfile.toString() + newline);
+						text.append(csgomainfolder.toString() + newline);
+						text.append(randomsong.toString() + newline);
+
+						if (hotkeyorderempty) {
+							text.append("" + newline);
+						} else {
+							text.append(temp.toString() + newline);
+						}
+						
+						if (convertpath == null || convertpath.toString().trim().equals("")){
+							text.append(""+newline);
+						}
+						else{
+							text.append(convertpath.toString()+newline);
+							System.out.println(convertpath.toString());
+						}
+
+						if (!haschanged) {
+							for (int i = 0; i < hotkeylist.size(); i++) {
+								text.append(String.valueOf(i + 1) + ":" + hotkeylist.get(i).getText() + ";" + newline);
+							}
+						} else {
+							if (hotkeysave > hotkeylist.size()) {
+								for (int i = 0; i < hotkeylist.size(); i++) {
+									text.append(
+											String.valueOf(i + 1) + ":" + hotkeylist.get(i).getText() + ";" + newline);
+								}
+								for (int i = hotkeylist.size(); i <= hotkeysave; i++) {
+									text.append(String.valueOf(i + 1) + ":NULL;" + newline);
+								}
+
+							} else {
+								for (int i = 0; i < hotkeysave; i++) {
+									text.append(
+											String.valueOf(i + 1) + ":" + hotkeylist.get(i).getText() + ";" + newline);
+								}
+							}
+						}
+
+						writeToHotkey(text.toString());
+
+						hotkeybuttonstrings.clear();
+
+						for (JButton j : hotkeylist) {
+							hotkeybuttonstrings.add(j.getText());
+						}
+
+						statusanzeige.setText("Erfolgreich!");
+
+						// if (!(selectedfile.toString() == "")) {
+						// StringBuilder firstbunch = new StringBuilder();
+						// for (int i = 0; i < wavfilenames.size(); i++) {
+						// firstbunch.append(
+						// "IF /i \"%wantedkey%\"==\"" + i + "\" GOTO " +
+						// wavfilenames.get(i).trim() + newline);
+						// }
+						//
+						// StringBuilder secondbunch = new StringBuilder();
+						// String maincsgofolder =
+						// selectedfile.toString().substring(0,
+						// selectedfile.toString().lastIndexOf('\\'));
+						// for (int i = 0; i < wavfilenames.size(); i++) {
+						// secondbunch.append(":" + wavfilenames.get(i).trim() +
+						// newline + "XCOPY \""
+						// + wavfilenamesfull.get(i) + "\\" + "voice_input.wav\"
+						// \"" +
+						// maincsgofolder + "\" /Y"
+						// + newline + "GOTO end" + newline);
+						// }
+						// String batchtext = "@echo off" + newline + "SET
+						// wantedkey=%1"
+						// + newline + firstbunch.toString()
+						// + "GOTO end" + newline + secondbunch.toString() +
+						// ":end" +
+						// newline + "exit 0";
+						//
+						// writeToBatch(batchtext);
+						// actionsucceful = true;
+						// }
+						//
+						// else {
+						// actionsucceful = false;
+						// }
+						//
+						// if (actionsucceful) {
+						// statusanzeige.setText("Erfolgreich!");
+						// } else {
+						// statusanzeige.setText("Sound Path ausw‰hlen!");
+						// }
+						// try {
+						// Thread.sleep(500);
+						// } catch (InterruptedException e) {
+						// e.printStackTrace();
+						// }
+
+					}
+
+				});
+
+				exitknopf.addActionListener(new ActionListener() {
+
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+						shutDown();
+					}
+
+				});
+
+				frame.setLocationRelativeTo(null);
+				frame.setVisible(true);
+
+				// registering the keylistener hook
+
+				try {
+					GlobalScreen.registerNativeHook();
+				} catch (NativeHookException ex) {
+					System.err.println("There was a problem registering the native hook.");
+					System.err.println(ex.getMessage());
+					JOptionPane.showMessageDialog(null, "Konnte Native Hook nicht laden", "Error",
+							JOptionPane.ERROR_MESSAGE);
+					System.exit(1);
+				}
+
+				GlobalScreen.addNativeKeyListener(new GlobalKeyListenerDemo());
+
+				// Get the logger for "org.jnativehook" and set the level to
+				// off.
+
+				Logger logger = Logger.getLogger(GlobalScreen.class.getPackage().getName());
+				logger.setLevel(Level.WARNING);
+
+				// Change the level for all handlers attached to the default
+				// logger.
+
+//				Handler[] handlers = Logger.getLogger("").getHandlers();
+//				for (int i = 0; i < handlers.length; i++) {
+//					handlers[i].setLevel(Level.OFF);
+//				}
+
+				// "Main Loop" Sleeps 1 s and then repeats. Waits for Shutdown
+				// via
+				// System.exit(0)
+
+				System.out.println(Thread.currentThread());		
+				
 		while (!closewanted) {
 			try {
 				Thread.sleep(1000);
@@ -615,96 +680,108 @@ public class CsgoSounds {
 
 	private static void createAskWindow() {
 
-		JFrame askframe = new JFrame("Enter new Hotkey Order");
-		askframe.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		askframe.setSize(90 * hotkeysize, 200);
-		askframe.setLayout(new GridLayout(0, hotkeysize, 5, 5));
-		nf = NumberFormat.getIntegerInstance();
-		nf.setMaximumIntegerDigits(3);
-		List<JFormattedTextField> textfields = new ArrayList<>();
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
 
-		for (int i = 0; i < hotkeysize; i++) {
-			JFormattedTextField t = new JFormattedTextField(nf);
-			t.setHorizontalAlignment(SwingConstants.CENTER);
-			t.setText(String.valueOf(hotkeyorder.get(i)));
-			textfields.add(t);
-			JLabel l = new JLabel(String.valueOf(i + 1), SwingConstants.CENTER);
-			l.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-			l.setFont(heading);
-			askframe.add(l);
-		}
+				JFrame askframe = new JFrame("Enter new Hotkey Order");
+				askframe.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+				askframe.setSize(90 * hotkeysize, 200);
+				askframe.setLayout(new GridLayout(0, hotkeysize, 5, 5));
+				nf = NumberFormat.getIntegerInstance();
+				nf.setMaximumIntegerDigits(3);
+				List<JFormattedTextField> textfields = new ArrayList<>();
 
-		textfields.forEach(textf -> askframe.add(textf));
+				for (int i = 0; i < hotkeysize; i++) {
+					JFormattedTextField t = new JFormattedTextField(nf);
+					t.setHorizontalAlignment(SwingConstants.CENTER);
+					t.setText(String.valueOf(hotkeyorder.get(i)));
+					textfields.add(t);
+					JLabel l = new JLabel(String.valueOf(i + 1), SwingConstants.CENTER);
+					l.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+					l.setFont(heading);
+					askframe.add(l);
+				}
 
-		JButton save2 = new JButton("Save");
-		save2.setFont(font);
-		askframe.add(save2);
-		JLabel status = new JLabel("", SwingConstants.CENTER);
-		status.setFont(font);
-		askframe.add(status);
-		save2.addActionListener(new ActionListener() {
+				textfields.forEach(textf -> askframe.add(textf));
 
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
+				JButton save2 = new JButton("Save");
+				save2.setFont(font);
+				askframe.add(save2);
+				JLabel status = new JLabel("", SwingConstants.CENTER);
+				status.setFont(font);
+				askframe.add(status);
+				save2.addActionListener(new ActionListener() {
 
-				List<String> getts = new ArrayList<>();
-				textfields.forEach(t -> {
-					getts.add(t.getText());
-				});
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
 
-				noundernull = true;
-				nodouble = true;
+						List<String> getts = new ArrayList<>();
+						textfields.forEach(t -> {
+							getts.add(t.getText());
+						});
 
-				getts.forEach(getp -> {
-					int num = Integer.parseInt(getp);
-					if (getp.equals("")) {
-						noundernull = false;
-					} else if (num <= 0 || num > wavfilenames.size()) {
-						noundernull = false;
-					}
-				});
+						noundernull = true;
+						nodouble = true;
 
-				for (int f = 0; f < getts.size(); f++) {
-					for (int m = 0; m < getts.size(); m++) {
-						if (f != m && getts.get(m).equals(getts.get(f))) {
-							nodouble = false;
+						getts.forEach(getp -> {
+							int num = Integer.parseInt(getp);
+							if (getp.equals("")) {
+								noundernull = false;
+							} else if (num <= 0 || num > wavfilenames.size()) {
+								noundernull = false;
+							}
+						});
+
+						for (int f = 0; f < getts.size(); f++) {
+							for (int m = 0; m < getts.size(); m++) {
+								if (f != m && getts.get(m).equals(getts.get(f))) {
+									nodouble = false;
+								}
+							}
+						}
+
+						if (noundernull && nodouble) {
+							hotkeyorder.clear();
+							getts.forEach(texxt -> hotkeyorder.add(Integer.parseInt(texxt.trim())));
+							askframe.dispose();
+							files.dispose();
+							updateLabels();
+						} else {
+							status.setText("Ungueltig!");
 						}
 					}
-				}
 
-				if (noundernull && nodouble) {
-					hotkeyorder.clear();
-					getts.forEach(texxt -> hotkeyorder.add(Integer.parseInt(texxt.trim())));
-					askframe.dispose();
-					files.dispose();
-					updateLabels();
-				} else {
-					status.setText("Ungueltig!");
-				}
+				});
+				askframe.setLocationRelativeTo(null);
+				askframe.setVisible(true);
+
 			}
-
 		});
-		askframe.setLocationRelativeTo(null);
-		askframe.setVisible(true);
 
 	}
 
 	private static void openPrompt() {
-		frame2 = new JFrame("Input for new Hotkey");
-		frame2.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		frame2.setLayout(new GridLayout(0, 1, 5, 5));
-		frame2.setFont(font);
-		frame2.setSize(200, 200);
-		JLabel text = new JLabel("Please press your liked Key now!", SwingConstants.CENTER);
-		text.setFont(font);
-		frame2.add(text);
-		pressedbutton.setFont(heading);
-		frame2.add(pressedbutton);
-		waitforinput = true;
-		frame2.pack();
-		frame2.setResizable(false);
-		frame2.setLocationRelativeTo(null);
-		frame2.setVisible(true);
+
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				frame2 = new JFrame("Input for new Hotkey");
+				frame2.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+				frame2.setLayout(new GridLayout(0, 1, 5, 5));
+				frame2.setFont(font);
+				frame2.setSize(200, 200);
+				JLabel text = new JLabel("Please press your liked Key now!", SwingConstants.CENTER);
+				text.setFont(font);
+				frame2.add(text);
+				pressedbutton.setFont(heading);
+				frame2.add(pressedbutton);
+				waitforinput = true;
+				frame2.pack();
+				frame2.setResizable(false);
+				frame2.setLocationRelativeTo(null);
+				frame2.setVisible(true);
+
+			}
+		});
 	}
 
 	private static void writeToHotkey(String s) {
@@ -817,38 +894,42 @@ public class CsgoSounds {
 	}
 
 	private static void showFiles() {
-		files = new JFrame("List of all Files.");
-		files.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				files = new JFrame("List of all Files.");
+				files.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-		if (wavfilenames.size() != 0) {
-			files.setLayout(new GridLayout(0, 4, 5, 5));
-			JLabel numbas;
-			JLabel texxt;
-			for (int i = 0; i < wavfilenames.size(); i++) {
-				numbas = new JLabel(String.valueOf(i + 1), SwingConstants.CENTER);
-				numbas.setFont(heading);
-				numbas.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-				files.add(numbas);
-				texxt = new JLabel(wavfilenames.get(i), SwingConstants.CENTER);
-				texxt.setFont(font);
-				texxt.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-				files.add(texxt);
+				if (wavfilenames.size() != 0) {
+					files.setLayout(new GridLayout(0, 4, 5, 5));
+					JLabel numbas;
+					JLabel texxt;
+					for (int i = 0; i < wavfilenames.size(); i++) {
+						numbas = new JLabel(String.valueOf(i + 1), SwingConstants.CENTER);
+						numbas.setFont(heading);
+						numbas.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+						files.add(numbas);
+						texxt = new JLabel(wavfilenames.get(i), SwingConstants.CENTER);
+						texxt.setFont(font);
+						texxt.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+						files.add(texxt);
+					}
+
+					files.setSize(new Dimension(650, 50 + 30 * (wavfilenames.size() / 2)));
+
+				}
+
+				else {
+					files.setLayout(new GridLayout(0, 1, 5, 5));
+					JLabel fail = new JLabel("No File selected!", SwingConstants.CENTER);
+					fail.setFont(font);
+					files.add(fail);
+					files.setSize(new Dimension(300, 100));
+				}
+
+				files.setLocationRelativeTo(null);
+				files.setVisible(true);
 			}
-
-			files.setSize(new Dimension(650, 50 + 30 * (wavfilenames.size() / 2)));
-
-		}
-
-		else {
-			files.setLayout(new GridLayout(0, 1, 5, 5));
-			JLabel fail = new JLabel("No File selected!", SwingConstants.CENTER);
-			fail.setFont(font);
-			files.add(fail);
-			files.setSize(new Dimension(300, 100));
-		}
-
-		files.setLocationRelativeTo(null);
-		files.setVisible(true);
+		});
 	}
 
 	public static void addActionListeners() {
@@ -911,106 +992,161 @@ public class CsgoSounds {
 	}
 
 	protected static void processFiles(List<File> l) {
-		ArrayList<File> tempFiles = new ArrayList<>();
-		for (File f : l) {
-			if (f.getName().toLowerCase().endsWith("mp3")) {
-				tempFiles.add(f);
-			}
-		}
-		;
-		if (tempFiles.isEmpty())
-			return;
+		
+		Thread t = new Thread(new Runnable(){
 
-		if (convertpath == null) {
-			JLabel msgLabel = new JLabel(
-					"<html>MP3 File Detected! Ready for Conversion.<br>  But first you have to choose a folder to place the converted File! Do you want to choose one now?</html>",
-					SwingConstants.CENTER);
-			int result = JOptionPane.showConfirmDialog(null, msgLabel, "Chose Folder now?", JOptionPane.YES_NO_OPTION);
-			if(!(result == JOptionPane.YES_OPTION)){
-				return;
-			}
-			JFileChooser chooser = new JFileChooser();
-			chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-			int returnval = chooser.showOpenDialog(null);
-			if(returnval == JFileChooser.APPROVE_OPTION){
-				convertpath = chooser.getSelectedFile().toPath();
-			}
-			else{
-				return;
-			}
-		}
+			@Override
+			public void run() {
 
-		if(true)
-		throw new RuntimeException();
 		
-		if(tempFiles.size() > 1){
-			int result = JOptionPane.showConfirmDialog(null, "You have selected more than 1 File. Convert all Files??", "Convert all Files?", JOptionPane.YES_NO_OPTION);
-			if(!(result == JOptionPane.YES_OPTION)){
-				return;
+				tempFiles = new ArrayList<>();
+				for (File f : l) {
+					if (f.getName().toLowerCase().endsWith("mp3")) {
+						tempFiles.add(f);
+					}
+				}
+				;
+				if (tempFiles.isEmpty())
+					return;
+
+				if (convertpath == null) {
+					JLabel msgLabel = new JLabel(
+							"<html>MP3 File Detected! Ready for Conversion.<br>  But first you have to choose a folder to place the converted File! Do you want to choose one now?</html>",
+							SwingConstants.CENTER);
+					int result = JOptionPane.showConfirmDialog(null, msgLabel, "Chose Folder now?",
+							JOptionPane.YES_NO_OPTION);
+					if (!(result == JOptionPane.YES_OPTION)) {
+						return;
+					}
+					JFileChooser chooser = new JFileChooser();
+					chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+					int returnval = chooser.showOpenDialog(null);
+					if (returnval == JFileChooser.APPROVE_OPTION) {
+						convertpath = chooser.getSelectedFile().toPath();
+					} else {
+						return;
+					}
+				}
+
+				if (tempFiles.size() > 1) {
+					int result = JOptionPane.showConfirmDialog(null,
+							"You have selected more than 1 File. Convert all Files??", "Convert all Files?",
+							JOptionPane.YES_NO_OPTION);
+					if (!(result == JOptionPane.YES_OPTION)) {
+						return;
+					}
+				}
+				
+				
+				System.out.println(Thread.currentThread());
+//				try {
+//					SwingUtilities.invokeAndWait(new Runnable(){
+//
+//						@Override
+//						public void run() {
+
+					 	System.out.println(Thread.currentThread());
+						convf = new JFrame("Progress");
+						convf.setSize(400, 160);
+						convf.setLayout(new GridLayout(2,0));
+						convf.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+						statuscounter = new JLabel("",SwingConstants.CENTER);
+						convf.add(statuscounter);
+						int size = tempFiles.size();
+						progressBar = new JProgressBar(0, size);
+						progressBar.setValue(0);
+						statuscounter.setFont(new Font("Comic Sans MS-PLAIN-12",Font.PLAIN,22));
+						convf.add(progressBar);
+						
+						convf.setLocationRelativeTo(null);
+						convf.setVisible(true);	
+
+						conv = new MyConverter();
+						System.out.println("konverter erstellt");
+						progressBar.setValue(0);	
+						statuscounter.setText(0+"/" + tempFiles.size()+ "   "+tempFiles.get(0).getName() );	
+//					}
+//});
+//				} catch (InvocationTargetException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				} catch (InterruptedException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				}
+				
+				SwingWorker<Void,Integer> sw = new SwingWorker<Void,Integer>(){
+
+					@Override
+					protected Void doInBackground() throws Exception {
+						for (int i = 0; i < tempFiles.size(); i++) {
+							System.out.println(Thread.currentThread());
+							int temp = i;
+							System.out.println(i);
+							conv.setWavFilePath(Paths.get(
+									convertpath + "\\" + FilenameUtils.removeExtension(tempFiles.get(i).getName()) + ".wav"));
+							conv.setMp3FilePath(Paths.get(tempFiles.get(i).getAbsolutePath()));
+							conv.convertMp3toWav();
+							conv.compressWavFile();
+							publish(temp+1);
+							setProgress(temp+1);
+						}
+						return null;
+					}
+					@Override
+					protected void process(List<Integer> chunks){
+						System.out.println(chunks);
+					}
+					
+				};
+				
+				sw.addPropertyChangeListener(new PropertyChangeListener(){
+					@Override
+					public void propertyChange(PropertyChangeEvent arg0) {
+						if("progress".equals(arg0.getPropertyName())){
+							int temp = (int) arg0.getNewValue();
+							progressBar.setValue(temp);	
+							statuscounter.setText(temp+"/" + tempFiles.size()+ "   "+tempFiles.get(temp-1).getName() );
+						}
+					}
+				});
+				
+				sw.execute();
+				
+				try {
+					sw.get();
+				} catch (InterruptedException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				} catch (ExecutionException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+
+				System.out.println("Alles hat geklappt!");
+//				try {
+//					Thread.sleep(500);
+//				} catch (InterruptedException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				}
+//				
+//				convf.dispose();
+				
+				
 			}
+			
+		});
+		t.start();
 		}
-		
-		JFrame convf = new JFrame("Progress");
-		convf.setLayout(new GridBagLayout());
-		GridBagConstraints c = new GridBagConstraints();
-		c.ipadx = 50;
-		c.ipady = 10;
-		c.insets = new Insets(10,10,10,10);
-		convf.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		
-		JLabel statuscounter = new JLabel("0/"+tempFiles.size(),SwingConstants.CENTER);
-		convf.add(statuscounter,c);
-		
-		JLabel currentfile = new JLabel(tempFiles.get(0).getName());
-		c.gridx = 1;
-		convf.add(currentfile,c);
-		
-		JProgressBar progressBar;
-		progressBar = new JProgressBar(0, tempFiles.size());
-		progressBar.setValue(0);
-		c.gridx = 0;
-		c.gridy = 1;
-		c.gridwidth = GridBagConstraints.REMAINDER;
-		
-		convf.add(progressBar,c);
-		
-		convf.setLocationRelativeTo(null);
-		convf.pack();
-		convf.setVisible(true);
-		
-		MyConverter conv = new MyConverter();
-		System.out.println("Converter erstellt!");
-		
-		for(int i = 0; i < tempFiles.size(); i++){
-			System.out.println("schleife aufgerufen");
-			System.out.println(tempFiles.size());
-			System.out.println(convertpath+"\\"+FilenameUtils.removeExtension(tempFiles.get(i).getName())+".wav");
-			conv.setWavFilePath(Paths.get(convertpath+"\\"+FilenameUtils.removeExtension(tempFiles.get(i).getName())+".wav"));
-			System.out.println("erstes wav file gesetzt");
-			System.out.println(tempFiles.get(i).getAbsolutePath());
-			conv.setMp3FilePath(Paths.get(tempFiles.get(i).getAbsolutePath()));
-			System.out.println("Versucht File zu konvertieren, mit: "+Paths.get(convertpath+"\\"+FilenameUtils.removeExtension(tempFiles.get(i).getName())+".wav"+" und "+tempFiles.get(i).getAbsolutePath()));
-			conv.convertMp3toWav();
-			conv.compressWavFile();
-			progressBar.setValue(i+1);
-		}
-		
-		System.out.println("Alles hat geklappt!");
-		try {
-			Thread.sleep(500);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		convf.dispose();
-		
-		
-	}
+	
 
 	public static File getSelectedfile() {
 		return selectedfile;
 	}
 
+	
 	public static List<Integer> getHotkeyorder() {
 		return hotkeyorder;
 	}
