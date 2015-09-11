@@ -35,12 +35,13 @@ public class DragAndDropFactory {
 		}
 		@Override
 		public boolean importData(TransferHandler.TransferSupport support){
+			System.out.println("DND : "+Thread.currentThread());
 			if(!canImport(support))
 				return false;
 			 Transferable t = support.getTransferable();
 			 try {
+				 System.out.println(Thread.currentThread());
 				List<File> l = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
-
 				processFiles(l);
 			} catch (UnsupportedFlavorException | IOException e) {
 				e.printStackTrace();
