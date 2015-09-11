@@ -3,7 +3,10 @@ package batchstarter;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.Label;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -42,11 +45,13 @@ import javax.swing.JFormattedTextField;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JProgressBar;
 import javax.swing.SwingConstants;
 import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import org.apache.commons.io.FilenameUtils;
 import org.jnativehook.GlobalScreen;
 import org.jnativehook.NativeHookException;
 import static java.nio.file.StandardWatchEventKinds.*;
@@ -935,6 +940,69 @@ public class CsgoSounds {
 			}
 		}
 
+		if(true)
+		throw new RuntimeException();
+		
+		if(tempFiles.size() > 1){
+			int result = JOptionPane.showConfirmDialog(null, "You have selected more than 1 File. Convert all Files??", "Convert all Files?", JOptionPane.YES_NO_OPTION);
+			if(!(result == JOptionPane.YES_OPTION)){
+				return;
+			}
+		}
+		
+		JFrame convf = new JFrame("Progress");
+		convf.setLayout(new GridBagLayout());
+		GridBagConstraints c = new GridBagConstraints();
+		c.ipadx = 50;
+		c.ipady = 10;
+		c.insets = new Insets(10,10,10,10);
+		convf.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		
+		JLabel statuscounter = new JLabel("0/"+tempFiles.size(),SwingConstants.CENTER);
+		convf.add(statuscounter,c);
+		
+		JLabel currentfile = new JLabel(tempFiles.get(0).getName());
+		c.gridx = 1;
+		convf.add(currentfile,c);
+		
+		JProgressBar progressBar;
+		progressBar = new JProgressBar(0, tempFiles.size());
+		progressBar.setValue(0);
+		c.gridx = 0;
+		c.gridy = 1;
+		c.gridwidth = GridBagConstraints.REMAINDER;
+		
+		convf.add(progressBar,c);
+		
+		convf.setLocationRelativeTo(null);
+		convf.pack();
+		convf.setVisible(true);
+		
+		MyConverter conv = new MyConverter();
+		System.out.println("Converter erstellt!");
+		
+		for(int i = 0; i < tempFiles.size(); i++){
+			System.out.println("schleife aufgerufen");
+			System.out.println(tempFiles.size());
+			System.out.println(convertpath+"\\"+FilenameUtils.removeExtension(tempFiles.get(i).getName())+".wav");
+			conv.setWavFilePath(Paths.get(convertpath+"\\"+FilenameUtils.removeExtension(tempFiles.get(i).getName())+".wav"));
+			System.out.println("erstes wav file gesetzt");
+			System.out.println(tempFiles.get(i).getAbsolutePath());
+			conv.setMp3FilePath(Paths.get(tempFiles.get(i).getAbsolutePath()));
+			System.out.println("Versucht File zu konvertieren, mit: "+Paths.get(convertpath+"\\"+FilenameUtils.removeExtension(tempFiles.get(i).getName())+".wav"+" und "+tempFiles.get(i).getAbsolutePath()));
+			conv.convertMp3toWav();
+			conv.compressWavFile();
+			progressBar.setValue(i+1);
+		}
+		
+		System.out.println("Alles hat geklappt!");
+		try {
+			Thread.sleep(500);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		convf.dispose();
 		
 		
 	}
