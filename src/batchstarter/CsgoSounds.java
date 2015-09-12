@@ -311,7 +311,7 @@ public class CsgoSounds {
 							if (!randomwavfilenames.isEmpty()) {
 								statusanzeige.setText(randomwavfilenames.get(currentsong));
 							} else {
-								statusanzeige.setText("Pick Random first!");
+								statusanzeige.setText("Choose Music Folder first!");
 							}
 						}
 					}
