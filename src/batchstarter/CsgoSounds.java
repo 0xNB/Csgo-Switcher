@@ -418,7 +418,7 @@ public class CsgoSounds {
 				frame.add(instruct);
 
 				frame.add(b);
-				JLabel csgolabel = new JLabel("Choose CSGO Folder", SwingConstants.CENTER);
+				JLabel csgolabel = new JLabel("Choose CSGO Folder:", SwingConstants.CENTER);
 				csgolabel.setFont(instructfont);
 				frame.add(csgolabel);
 				JButton csgofolderbutton = new JButton("Open File");
@@ -435,8 +435,8 @@ public class CsgoSounds {
 
 				});
 
-				JLabel chooserandom = new JLabel("Choose Random Folder (Optional)");
-				chooserandom.setFont(new Font("Comic Sans MS", Font.PLAIN, 11));
+				JLabel chooserandom = new JLabel("Choose Music Folder:",SwingConstants.CENTER);
+				chooserandom.setFont(instructfont);
 
 				JButton chooserandomb = new JButton("Open File");
 				chooserandomb.setFont(font);
