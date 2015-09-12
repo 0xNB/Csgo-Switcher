@@ -362,7 +362,7 @@ public class CsgoSounds {
 					@Override
 					public void actionPerformed(ActionEvent arg0) {
 						JFileChooser chooser = new JFileChooser();
-						if(!(convertpath.toString().equals(""))){
+						if(!(convertpath == null || convertpath.toString().equals(""))){
 							chooser.setCurrentDirectory(convertpath.toFile());
 						}
 						chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
