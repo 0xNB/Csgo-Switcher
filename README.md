@@ -11,4 +11,9 @@ How to make ready for first use:
 3 - Select your main Csgo folder. Its the folder under Program Files - Steam - SteamApps - common - CounterStrikeGlobalOffensive
       * It is called Counter-Strike Global Offensive
 
-4 - Now you are ready to go and you can play around with the program as you like!
+4 - How to actually use ingame:
+  Bind some Keys in the program first to switch between songs or use left and right arrow to navigate through your selected folder.
+  
+  Press the key u binded in step [1], and there you go, your song is playing. To switch it just navigate with the left and right arrow keys, to swap between songs under the random folder, or use your hotkey to switch them.
+  
+  When the song ends or you need to stop it mid way just press the key from step [1] again. Also make sure to press your voice key to stop posting in voice chat.
