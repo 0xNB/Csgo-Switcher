@@ -61,7 +61,7 @@ public class MyConverter {
 			audioInputStream = AudioSystem.getAudioInputStream(musicfile);
 			System.out.println(audioInputStream.getFormat());
 			AudioFormat format = audioInputStream.getFormat();
-			AudioFormat outDataFormat = new AudioFormat((float) 22000.0, (int) 16, (int) 1, true, false);
+			AudioFormat outDataFormat = new AudioFormat((float) 22050.0, (int) 16, (int) 1, true, false);
 			if (AudioSystem.isConversionSupported(outDataFormat, format)) {
 				System.out.println("Conversion Supported!");
 				AudioInputStream lowResAis = AudioSystem.getAudioInputStream(outDataFormat, audioInputStream);
