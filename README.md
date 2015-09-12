@@ -8,6 +8,8 @@ How to make ready for first use:
   
 2 - Open up the Switcher Program and select your music folder and your sound folder. You need to convert your songs first by simply dragging and dropping them on the application. Those converted files need to go in the music or the sound folder.
 
+Note: The program lets you have two different folder paths where you can actually put your converted .wav files to. One folder is for sounds, which are accesible to hotkey presses, and the other one is for music to shuffle trough with your arrow keys ingame.
+
 3 - Select your main Csgo folder. Its the folder under Program Files - Steam - SteamApps - common - CounterStrikeGlobalOffensive
       * It is called Counter-Strike Global Offensive
 
